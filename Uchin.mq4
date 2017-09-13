@@ -16,6 +16,7 @@ extern double TP_pips = 30;
 extern double Trail_pips = 30;
 
 input int Entry_Time_H = 6;
+input int Exit_Time_H = 18;
 
 input bool Monday_Entry = False;
 input bool Tuesday_Entry = True;
@@ -38,7 +39,7 @@ int whichDirection() {
   double open = iOpen(thisSymbol, PERIOD_D1, 1);
   double close = iClose(thisSymbol, PERIOD_D1, 1);
 
-  return (close < open) ? OP_BUY : OP_SELL;
+  return (open < close) ? OP_BUY : OP_SELL;
 }
 
 
@@ -80,7 +81,7 @@ void OnDeinit(const int reason)
 
 void trail() {
   
-  for(int i = 0; i < OrdersTotal() &&  0 < Trail_pips; i++) {
+  for(int i = 0; i < OrdersTotal() && 0 < Trail_pips; i++) {
     if(OrderSelect(i, SELECT_BY_POS)) {
       if(!StringCompare(OrderSymbol(), thisSymbol) && OrderMagicNumber() == Magic_Number) {
         
@@ -100,6 +101,32 @@ void trail() {
   }
 }
 
+void closeAll() {
+
+  for(int i = 0; i < OrdersTotal(); i++) {
+    if(OrderSelect(i, SELECT_BY_POS)) {
+      if(OrderMagicNumber() == Magic_Number && thisSymbol == Symbol()) {
+      
+        if(OrderType() == OP_BUY) {
+          if(OrderClose(OrderTicket(), OrderLots(), Bid, 3)) {
+            i = -1;
+          }
+        }
+        else if(OrderType() == OP_SELL) {
+          if(OrderClose(OrderTicket(), OrderLots(), Ask, 3)) {
+            i = -1;
+          }
+        }
+        else if(OrderType() == OP_SELLSTOP || OrderType() == OP_BUYSTOP) {
+          if(OrderDelete(OrderTicket())) {
+            i = -1;
+          }
+        }
+      }
+    }
+  }
+}
+
 
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
@@ -110,6 +137,11 @@ void OnTick()
 
   datetime dt = TimeLocal();
   int h = TimeHour(dt);
+
+  if(h == Exit_Time_H) {
+    closeAll();
+    return;
+  }
 
   if(orderSent) {
     if(h != Entry_Time_H) {
